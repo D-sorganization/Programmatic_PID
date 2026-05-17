@@ -77,12 +77,12 @@ jobs:
         run: pip-audit -r requirements.txt --progress-spinner=off
 
   tests:
-    needs: quality-gate
     runs-on: self-hosted
     timeout-minutes: 20
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
