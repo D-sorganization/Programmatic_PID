@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   quality-gate:
-    runs-on: self-hosted
+    runs-on: d-sorg-fleet
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +54,7 @@ jobs:
         run: python scripts/check_ci_policy.py no-placeholders
 
   security-scan:
-    runs-on: self-hosted
+    runs-on: d-sorg-fleet
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +77,7 @@ jobs:
         run: pip-audit -r requirements.txt --progress-spinner=off
 
   tests:
-    runs-on: self-hosted
+    runs-on: d-sorg-fleet
     timeout-minutes: 20
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
