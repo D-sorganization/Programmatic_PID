@@ -36,6 +36,7 @@ jobs:
         run: python -m pytest -p no:xvfb tests/ -m "not live_simulation" --durations=20
 
   report-failure:
+    timeout-minutes: 30
     needs: nightly-tests
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
