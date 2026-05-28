@@ -22,7 +22,6 @@ This repository generates P&ID drawings from YAML specifications. The maintained
 - Keep `SPEC.md` truthful. If the implementation changes, update the spec in the same workstream.
 - Keep the README, spec, and repo layout consistent enough that another engineer can find the CLI, schema, tests, and generated outputs quickly.
 
-
 ---
 
 <!-- BEGIN FLEET-MANAGED: reasoning-engagement -->
@@ -96,7 +95,6 @@ for k in ['core', 'graphql']:
 
 <!-- END FLEET-MANAGED: network-api-hygiene -->
 
-
 ## Closing issues — non-negotiable rule
 
 NEVER close a feature or bug issue without one of:
@@ -107,6 +105,7 @@ NEVER close a feature or bug issue without one of:
 The **Verify-Issue-Closure** workflow will automatically reopen any issue closed without evidence. Do not work around it.
 
 When implementing an issue:
+
 - Write or update tests FIRST (TDD: red → green → refactor)
 - Add Design-by-Contract preconditions/postconditions where it clarifies invariants
 - Respect Law of Demeter — don’t reach through three layers
@@ -116,12 +115,12 @@ When implementing an issue:
 
 ### How to close issues properly
 
-| Method | Example |
-|--------|---------|
-| Closing keyword in PR body | `Closes #1234` or `Fixes #5678` |
-| Closing keyword in PR title | `fix: resolve login crash (#1234)` |
-| Exempt label | Apply `wontfix`, `roadmap`, `duplicate`, `invalid`, or `not-planned` |
-| Bot + auto-generated label | Only for auto-generated issues closed by bots |
+| Method                      | Example                                                              |
+| --------------------------- | -------------------------------------------------------------------- |
+| Closing keyword in PR body  | `Closes #1234` or `Fixes #5678`                                      |
+| Closing keyword in PR title | `fix: resolve login crash (#1234)`                                   |
+| Exempt label                | Apply `wontfix`, `roadmap`, `duplicate`, `invalid`, or `not-planned` |
+| Bot + auto-generated label  | Only for auto-generated issues closed by bots                        |
 
 The workflow checks the PR timeline for cross-referenced merged PRs with closing keywords. If none are found and no exempt label is present, the issue is reopened with an explanatory comment.
 
@@ -146,11 +145,11 @@ Use repo-local context before broad exploration:
 
 ## Hook bypass policy
 
-**Never use `git commit --no-verify` or `git push --no-verify` unless the hook itself is broken** (tooling not installed, hook script crashes). It is *not* an acceptable workaround for a hook that flags real issues.
+**Never use `git commit --no-verify` or `git push --no-verify` unless the hook itself is broken** (tooling not installed, hook script crashes). It is _not_ an acceptable workaround for a hook that flags real issues.
 
 ### When a hook fails on something you didn't touch
 
-The hook is scoped to *your diff*. If `fleet-fast-guardrails` or any other guardrail reports a violation in a file you didn't change, that's a regression — file an issue against `Repository_Management`. Bypassing locally doesn't help: the same checks run in CI's `quality-gate` and will block the PR.
+The hook is scoped to _your diff_. If `fleet-fast-guardrails` or any other guardrail reports a violation in a file you didn't change, that's a regression — file an issue against `Repository_Management`. Bypassing locally doesn't help: the same checks run in CI's `quality-gate` and will block the PR.
 
 ### When the hook is legitimately broken
 

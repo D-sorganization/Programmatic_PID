@@ -8,8 +8,6 @@ name: Local-Only Workflow Runner Guard
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/**"
   push:
     branches: [main]
     paths:
