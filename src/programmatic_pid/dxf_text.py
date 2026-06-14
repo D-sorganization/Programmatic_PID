@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Sequence
 from typing import Any
 
 from ezdxf.enums import TextEntityAlignment
@@ -102,7 +103,7 @@ def add_text_panel(
     w: float,
     h: float,
     title: str,
-    lines: list[str | None],
+    lines: Sequence[str | None],
     text_h: float,
     text_layer: str,
     border_layer: str,
