@@ -12,3 +12,9 @@ def test_pytest_config_does_not_require_undeclared_plugins() -> None:
     assert "asyncio_mode" not in pytest_options
     assert "asyncio_default_fixture_loop_scope" not in pytest_options
     assert not any(dependency.startswith("pytest-asyncio") for dependency in dev_dependencies)
+
+
+def test_ci_security_tool_is_declared_in_dev_requirements() -> None:
+    dev_requirements = Path("dev-requirements.txt").read_text(encoding="utf-8").splitlines()
+
+    assert any(requirement.startswith("pip-audit") for requirement in dev_requirements)

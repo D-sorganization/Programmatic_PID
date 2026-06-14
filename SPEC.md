@@ -1,6 +1,6 @@
 # Programmatic-PID Specification
 
-**Version:** 0.1.4 — 2026-06-14
+**Version:** 0.1.5 — 2026-06-14
 
 ## Purpose
 
@@ -21,7 +21,7 @@
 - `output/` is the local generation target directory for drawings and previews.
 - `docs/` holds engineering notes and related documentation.
 - `requirements.txt` lists runtime dependencies (install with `pip install -r requirements.txt`).
-- `dev-requirements.txt` lists development dependencies (testing, linting, type checking).
+- `dev-requirements.txt` lists development dependencies (testing, linting, type checking, security auditing).
 
 ## Runtime Responsibilities
 
@@ -72,6 +72,8 @@ The package also supports layout profiles such as `review`, `presentation`, and 
   caller opts in explicitly.
 - Pytest configuration must not include plugin-specific options unless the
   matching plugin is declared in the development dependency set.
+- CI-invoked command-line tools, including `pip-audit`, must be declared in
+  `dev-requirements.txt`.
 - The repo expects packaging-compatible imports from `src/` rather than ad hoc path manipulation.
 
 ## Maintenance Notes
