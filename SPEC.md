@@ -1,6 +1,6 @@
 # Programmatic-PID Specification
 
-**Version:** 0.1.3 — 2026-05-10
+**Version:** 0.1.4 — 2026-06-14
 
 ## Purpose
 
@@ -70,6 +70,8 @@ The package also supports layout profiles such as `review`, `presentation`, and 
   `--durations=20`, and a deterministic offline marker filter that excludes
   `slow`, `live_simulation`, `e2e`, and `requires_network` tests unless a
   caller opts in explicitly.
+- Pytest configuration must not include plugin-specific options unless the
+  matching plugin is declared in the development dependency set.
 - The repo expects packaging-compatible imports from `src/` rather than ad hoc path manipulation.
 
 ## Maintenance Notes
