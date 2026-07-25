@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: 'pip'
+          cache: "pip"
 
       - name: Create isolated Python environment
         run: |
@@ -28,10 +28,13 @@ jobs:
           echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
 
       - name: Install dependencies
+        env:
+          PIP_DEFAULT_TIMEOUT: "120"
+          PIP_RETRIES: "5"
         run: |
-          pip install -r requirements.txt
-          pip install --force-reinstall --ignore-installed -r dev-requirements.txt
-          pip install -e .
+          python -m pip install --retries "$PIP_RETRIES" -r requirements.txt
+          python -m pip install --retries "$PIP_RETRIES" --force-reinstall --ignore-installed -r dev-requirements.txt
+          python -m pip install --retries "$PIP_RETRIES" -e .
 
       - name: Run nightly tests
         run: python -m pytest -p no:xvfb tests/ -m "not live_simulation" --durations=20
@@ -50,10 +53,46 @@ jobs:
           script: |
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const today = new Date().toISOString().slice(0, 10);
+            const labels = ['ci-failure', 'nightly'];
+            const normalizedSignature = [
+              context.workflow,
+              context.repo.repo,
+              'nightly-tests',
+            ].join('::').toLowerCase();
+            const occurrence = [
+              `- Run: ${runUrl}`,
+              `  Run ID: \`${context.runId}\``,
+              `  Commit: \`${context.sha}\``,
+              `  Runner: \`${process.env.RUNNER_NAME || 'unknown'}\``,
+              '  Failing step: `nightly-tests`',
+              `  Signature: \`${normalizedSignature}\``,
+            ].join('\n');
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: labels.join(','),
+              per_page: 25,
+            });
+            const existing = existingIssues.find((issue) => !issue.pull_request);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Nightly failure occurrence recorded for ${today}.\n\n${occurrence}`,
+              });
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Nightly CI failure - ${today}`,
-              body: `The scheduled nightly workflow failed.\n\nRun: ${runUrl}\n\nWorkflow: \`${context.workflow}\`\nCommit: \`${context.sha}\``,
-              labels: ['ci-failure', 'nightly'],
+              body: [
+                'The scheduled nightly workflow failed.',
+                '',
+                '## Occurrences',
+                occurrence,
+              ].join('\n'),
+              labels,
             });
