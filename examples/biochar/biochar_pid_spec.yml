@@ -4,7 +4,7 @@ project:
   subtitle: Low-positive-pressure retort with controlled vent path, upstream dryer, and sealed char cooling
   revision: B
   author: Dieter
-  company: InEnTec
+  company: Example Co.
   date: 2026-03-06
   units:
     length: ft
@@ -43,7 +43,7 @@ project:
         - {label: Rev, value: B}
         - {label: Date, value: 2026-03-06}
         - {label: Author, value: Dieter}
-        - {label: Company, value: InEnTec}
+        - {label: Company, value: Example Co.}
 
 layers:
   equipment: {color: 7, linetype: CONTINUOUS}

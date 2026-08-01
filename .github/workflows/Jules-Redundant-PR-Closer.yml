@@ -51,11 +51,11 @@ permissions:
 
 concurrency:
   group: jules-redundant-pr-closer-${{ github.repository }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   close-redundant:
-    runs-on: d-sorg-fleet
+    runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Generate Jules app token

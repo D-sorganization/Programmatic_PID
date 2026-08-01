@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   nightly-tests:
-    runs-on: d-sorg-fleet
+    runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 30
     needs: nightly-tests
     if: failure() && github.event_name == 'schedule'
-    runs-on: d-sorg-fleet
+    runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     permissions:
       issues: write
     steps:
