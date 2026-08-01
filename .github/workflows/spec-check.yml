@@ -1,4 +1,4 @@
-# spec-check.yml — Specification Freshness Enforcement
+# spec-check.yml â€” Specification Freshness Enforcement
 name: Spec Check
 
 on:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   spec-freshness:
     name: Verify SPEC.md freshness
-    runs-on: d-sorg-fleet
+    runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'spec-exempt') }}
     timeout-minutes: 5
 

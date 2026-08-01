@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release of Programmatic-PID.
 - DXF generation engine with text, circle, and polyline entities.
-- PID controller integration for automated sheet layout.
+- Control-loop rendering (signal lines from instrument to final element)
+  and automated sheet layout.
 - CLI entry point for batch DXF creation.
 - Unit test suite with pytest.

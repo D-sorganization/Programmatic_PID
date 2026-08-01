@@ -1,23 +1,41 @@
 name: Local-Only Workflow Runner Guard
 
-# Enforces that every workflow in this repo routes its jobs to the d-sorg
-# self-hosted fleet. The guard runs on ubuntu-latest because it is the canary
-# that must remain operable when the fleet itself is down. The job is named
-# "Reject hosted runner routing" — together with the workflow name above, these
-# are the only two names allowlisted to run on hosted runners across the org.
+# Keeps Actions minutes off the metered quota by routing jobs to the d-sorg
+# self-hosted fleet — but only where that is actually the cheaper and safer
+# choice, which depends on repository visibility:
+#
+#   private / internal — hosted runners are billed against the org quota, so
+#     every job must route to the fleet. Enforced; a violation fails the build.
+#
+#   public — GitHub-hosted standard runners are free and unmetered, so the cost
+#     argument for the fleet disappears entirely. The safety argument actively
+#     reverses: GitHub advises against using self-hosted runners with public
+#     repositories, because a fork pull request can run attacker-controlled code
+#     on a persistent machine you own. Here hosted runners are permitted, and
+#     remaining self-hosted jobs are annotated as a warning rather than failed,
+#     so a repo can be migrated incrementally.
+#
+# The guard runs on ubuntu-latest because it is the canary that must remain
+# operable when the fleet itself is down. The job is named "Reject hosted runner
+# routing" — together with the workflow name above, these are the only two names
+# allowlisted to run on hosted runners across the org. Do not rename the job:
+# it is the required status check for the `block-hosted-runner-merge` ruleset.
 
 on:
   pull_request:
     paths:
       - ".github/workflows/**"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/**"
   workflow_dispatch:
+
+concurrency:
+  group: local-only-runner-guard-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   reject-hosted-runner-routing:
@@ -25,24 +43,66 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
       - name: Install PyYAML
         run: pip install --disable-pip-version-check pyyaml==6.0.2
 
-      - name: Verify all workflows route to d-sorg-fleet
+      - name: Verify runner routing matches repository visibility
         shell: python
+        env:
+          REPO_VISIBILITY: ${{ github.event.repository.visibility }}
+          # Only consumed by the API fallback below, when the event payload
+          # carries no repository object. GITHUB_TOKEN is not an automatic
+          # environment variable; it has to be passed in explicitly.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          import os
           import re
           import sys
           from pathlib import Path
 
           import yaml
+
+          # On a public repo, hosted runners are free and self-hosted runners are
+          # the liability. Enforce fleet-only routing exactly as before on
+          # private and internal repos; on public repos, invert to advisory.
+          # Default to enforcing when visibility is unreadable — failing closed
+          # is the safe direction, since the cost of a false failure is a
+          # re-run and the cost of a false pass is a billed month.
+          visibility = (os.environ.get("REPO_VISIBILITY") or "").strip().lower()
+          if not visibility:
+              # `github.event.repository` is absent on some event types. Fall back
+              # to the API rather than guessing, because guessing "private" would
+              # fail every build on a public repo.
+              import json
+              import urllib.request
+
+              try:
+                  req = urllib.request.Request(
+                      f"{os.environ['GITHUB_API_URL']}/repos/{os.environ['GITHUB_REPOSITORY']}",
+                      headers={
+                          "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                          "Accept": "application/vnd.github+json",
+                      },
+                  )
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      visibility = (json.load(resp).get("visibility") or "").lower()
+              except Exception as exc:  # noqa: BLE001 - any failure means "unknown"
+                  print(f"::warning::could not read repository visibility: {exc}")
+          is_public = visibility == "public"
+          print(f"Repository visibility: {visibility or '<unknown>'}")
+          print(
+              "Hosted runners are FREE here; self-hosted jobs will be reported as warnings."
+              if is_public
+              else "Hosted runners are METERED here; every job must route to d-sorg-fleet."
+          )
+          print()
 
           # Workflow files allowlisted to run on hosted runners. The guard itself
           # is here because it is the canary. The runner-health-alert canary in
@@ -58,7 +118,72 @@ jobs:
               "Reject hosted runner routing",
               "Local-Only Workflow Runner Guard",
           }
-          HOSTED = re.compile(r"^(ubuntu|macos|windows)(-latest|-\d+)?$")
+          HOSTED = re.compile(r"^(ubuntu|macos|windows)(-latest|-\d+(\.\d+)?)?$")
+
+          NEEDS_OUTPUT = re.compile(r"needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)")
+          QUOTED_LITERAL = re.compile(r"'([^']*)'")
+
+          def expression_candidates(value: str) -> list[str]:
+              """Return every runner label a `${{ ... }}` expression could resolve to.
+
+              A toggle such as
+
+                  ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
+
+              can produce either label depending on a repository variable, so both
+              are candidates and both must be judged. Treating the expression as a
+              single opaque string is what previously let a hosted-runner route
+              through the guard: the text contains "d-sorg-fleet", so a substring
+              test concluded it routed to the fleet.
+              """
+              if "${{" not in value:
+                  return []
+              return [lit for lit in QUOTED_LITERAL.findall(value) if lit.strip()]
+
+          # A picker that branches on repository visibility enforces the billing
+          # rule itself, at runtime, and cannot emit a hosted label on a repo that
+          # would be billed for it. Judging its emitted labels statically would
+          # report a violation it is structurally incapable of committing, so it
+          # is recorded as trusted instead.
+          VISIBILITY_AWARE = "<visibility-aware picker>"
+
+          def resolve_needs_output(value: str, jobs: dict) -> list[str]:
+              """Resolve `needs.<job>.outputs.<name>` to the literal(s) it can emit.
+
+              The pick-runner indirection is the fleet's standard shape, so a guard
+              that treats every reference to it as "self-hosted" reports the label
+              the job is named after rather than the one it actually emits. Read the
+              producing job's `run` blocks for `<name>=<literal>` and use that.
+              """
+              m = NEEDS_OUTPUT.search(value)
+              if not m:
+                  return []
+              producer, output = m.group(1), m.group(2)
+              job = jobs.get(producer)
+              if not isinstance(job, dict):
+                  return []
+              emitted: list[str] = []
+              assign = re.compile(rf"{re.escape(output)}=([A-Za-z0-9_.$-]+)")
+              for step in job.get("steps") or []:
+                  if not isinstance(step, dict):
+                      continue
+                  env_text = " ".join(str(v) for v in (step.get("env") or {}).values())
+                  run_text = step.get("run") if isinstance(step.get("run"), str) else ""
+                  if "repository.visibility" in env_text or "repository.visibility" in run_text:
+                      return [VISIBILITY_AWARE]
+                  if run_text:
+                      emitted.extend(assign.findall(run_text))
+              # A shell variable indirection (runner=$RUNNER) is not a literal, so
+              # fall back to the labels assigned anywhere in the producing job.
+              if emitted and all(e.startswith("$") for e in emitted):
+                  labels = re.compile(r"\b(d-sorg-fleet[a-z-]*|self-hosted|ubuntu-[\w.]+|"
+                                      r"macos-[\w.]+|windows-[\w.]+)\b")
+                  found: list[str] = []
+                  for step in job.get("steps") or []:
+                      if isinstance(step, dict) and isinstance(step.get("run"), str):
+                          found.extend(labels.findall(step["run"]))
+                  return found or emitted
+              return emitted
 
           def collect_runs_on(job: dict) -> list[str]:
               runs_on = job.get("runs-on")
@@ -84,6 +209,8 @@ jobs:
               return values
 
           violations: list[str] = []
+          advisories: list[str] = []
+          trusted: list[str] = []
           wf_dir = Path(".github/workflows")
           if not wf_dir.is_dir():
               print("No .github/workflows directory; nothing to check.")
@@ -112,30 +239,70 @@ jobs:
                       continue
                   values = collect_runs_on(job)
                   if not values:
-                      # Could be an expression like ${{ needs.pick-runner.outputs.runner }};
+                      # Could be a pick-runner output expression.
                       # treat the raw expression text as the value to inspect.
                       raw = job.get("runs-on")
                       if isinstance(raw, str):
                           values = [raw]
+                  # Reduce every runs-on to the concrete set of labels it can
+                  # actually produce: dereference needs.<job>.outputs.<x> through
+                  # the producing job, and expand a `${{ ... }}` toggle into each
+                  # branch it can select. Judging the raw expression text instead
+                  # is what previously let hosted routing slip through.
+                  resolved: list[str] = []
                   for v in values:
-                      v_clean = v.strip()
-                      # Expressions that resolve at runtime to fleet labels are OK
-                      if "pick-runner" in v_clean or "d-sorg-fleet" in v_clean or "self-hosted" in v_clean:
-                          continue
-                      if HOSTED.match(v_clean):
+                      candidates = resolve_needs_output(v, jobs) or expression_candidates(v)
+                      resolved.extend(candidates or [v])
+                  values = resolved
+
+                  candidates = [v.strip() for v in values]
+                  if VISIBILITY_AWARE in candidates:
+                      trusted.append(f"{wf.name}::{job_id}")
+                      continue
+
+                  fleet = [c for c in candidates if "d-sorg-fleet" in c or "self-hosted" in c]
+                  hosted = [c for c in candidates if HOSTED.match(c)]
+
+                  if hosted and not is_public:
+                      # Reached when a job *can* select a hosted runner on a billable
+                      # repo -- including through a toggle that currently points at
+                      # the fleet. It fails either way: a repository variable is a
+                      # preference, not a security control, and anyone who can set
+                      # it could flip the routing without touching a workflow file.
+                      for c in hosted:
                           violations.append(
-                              f"{wf.name}::{job_id}: runs-on '{v_clean}' is a hosted runner; "
-                              f"route to d-sorg-fleet (or `${{{{ needs.pick-runner.outputs.runner }}}}`)."
+                              f"{wf.name}::{job_id}: can route to '{c}', a metered hosted runner, "
+                              "and this repository is not public. Pin it to d-sorg-fleet."
                           )
+                  elif fleet and is_public and not hosted:
+                      # Only worth reporting where the fleet is the *only* option.
+                      # A job that can already choose hosted is opted in to the
+                      # toggle, and flagging it every run would be noise.
+                      advisories.append(
+                          f"{wf.name}::{job_id}: pinned to '{fleet[0]}' with no hosted "
+                          "alternative. This repo is public, so hosted runners are free and a "
+                          "fork PR can run untrusted code on the fleet machine."
+                      )
+
+          for a in advisories:
+              print(f"::warning::{a}")
 
           if violations:
               print("\n".join(f"::error::{v}" for v in violations))
               print()
-              print(f"{len(violations)} workflow(s) leak to hosted runners.")
+              print(f"{len(violations)} job(s) leak to metered hosted runners.")
               print(
                   "Allowed: local-only-runner-guard.yml, runner-health-alert.yml, "
                   "and jobs literally named 'Reject hosted runner routing'."
               )
               sys.exit(1)
 
-          print("All workflows route to d-sorg-fleet.")
+          if trusted:
+              print(f"{len(trusted)} job(s) route via a visibility-aware picker: " + ", ".join(trusted))
+          if is_public:
+              print(
+                  f"Public repo: hosted runners permitted. "
+                  f"{len(advisories)} job(s) can still reach the self-hosted fleet."
+              )
+          else:
+              print("No job can route to a metered hosted runner.")
