@@ -88,3 +88,4 @@ The package also supports layout profiles such as `review`, `presentation`, and 
 | Date | PR / Issue | Summary |
 | --- | --- | --- |
 | 2026-09-10 | #1610 | Add maintainable Mermaid C4 architecture map contract and CI validation. |
+- 2026-09-14: Downgraded non-existent workflow action versions to @v4/@v5 across workflows (#135).
