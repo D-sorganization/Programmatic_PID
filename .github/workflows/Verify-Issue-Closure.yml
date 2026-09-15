@@ -86,7 +86,7 @@ jobs:
             );
 
             const closingRegex = new RegExp(
-              `\\b(closes|closed|closer|fixes|fixed|fix|resolves|resolved|resolve)\\s+(?:[\\w.-]+\\/[\\w.-],)?#${issueNumber}\\b`,
+              `\\b(closes|closed|close|fixes|fixed|fix|resolves|resolved|resolve)\\s+(?:[\\w.-]+\\/[\\w.-]+)?#${issueNumber}\\b`,
               'i'
             );
 
@@ -100,7 +100,7 @@ jobs:
               }
               if (event.event === 'closed' && event.commit_id) {
                 // A commit closed the issue; the commit message itself counts as evidence.
-                core.infoh`Issue #${issueNumber} closed by commit ${event.commit_id}; treating as evidence.`);
+                core.info(`Issue #${issueNumber} closed by commit ${event.commit_id}; treating as evidence.`);
                 return;
               }
             }
@@ -109,11 +109,11 @@ jobs:
               try {
                 const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
                 if (pr.merged === true && closingRegex.test(pr.body || '')) {
-                  core.infoh` Merged PR #${prNumber} closes #${issueNumber} via closing keyword.`);
+                  core.info(`Merged PR #${prNumber} closes #${issueNumber} via closing keyword.`);
                   return;
                 }
                 if (pr.merged === true && closingRegex.test(pr.title || '')) {
-                  core.infoh`Merged PR #${prNumber} title contains closing keyword for #${issueNumber}.`);
+                  core.info(`Merged PR #${prNumber} title contains closing keyword for #${issueNumber}.`);
                   return;
                 }
               } catch (err) {
@@ -123,16 +123,16 @@ jobs:
 
             // No evidence found — reopen and comment.
             const body = [
-              `Hi @${senderLogin}— this issue was closed without evidence of implementation, so the closure-guard workflow has reopened it.`,
-              ```,
+              `Hi @${senderLogin} — this issue was closed without evidence of implementation, so the closure-guard workflow has reopened it.`,
+              ``,
               `To legitimately close this issue, one of the following must be true:`,
-             ```,
-              `1. A **merged PR** references this issue with a closing keyword in its body or title— use the exact phrasing \`Closes #${issueNumber}\` (or \`Fixes\P/\ Resolves\`).`,
-              `2. Apply one of these labels to explicitly mark it as not-going-to-be-implemented: \`wontfix\e, `roadmap\l, `duplicate\P, `invalid\P, `not-planned\\`.`,
-              ```,
+              ``,
+              `1. A **merged PR** references this issue with a closing keyword in its body or title — use the exact phrasing \`Closes #${issueNumber}\` (or \`Fixes\`/\`Resolves\`).`,
+              `2. Apply one of these labels to explicitly mark it as not-going-to-be-implemented: \`wontfix\`, \`roadmap\`, \`duplicate\`, \`invalid\`, \`not-planned\`.`,
+              ``,
               `If you believe the work _is_ done but the PR didn't use the closing keyword, edit the PR description to add \`Closes #${issueNumber}\` and close this issue again.`,
-              ```,
-              `See \`.github/workflows/Verify-Issue-Closure.yml\i for the full rule set.`,
+              ``,
+              `See \`.github/workflows/Verify-Issue-Closure.yml\` for the full rule set.`,
             ].join('\n');
 
             await github.rest.issues.createComment({
