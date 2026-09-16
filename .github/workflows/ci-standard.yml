@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality-gate:
+  lint:
     runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -113,3 +113,44 @@ jobs:
         with:
           token: ${{ env.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+  # Required branch-protection context for `main` (org ruleset
+  # Repository_Protections requires exactly this name). It aggregates lint AND
+  # the test suite so a red test run blocks merge - before the 2026-09-15 fleet
+  # audit only lint was gated here and failing tests merged freely.
+  #
+  # `if: always()` is load-bearing: without it an upstream failure *skips* this
+  # job, and GitHub treats a skipped required check as passing.
+  quality-gate:
+    needs: [lint, tests]
+    if: always()
+    runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Require every gated job to succeed
+        shell: bash
+        env:
+          RESULT_LINT: ${{ needs.lint.result }}
+          RESULT_TESTS: ${{ needs.tests.result }}
+          SKIPPED_OK: "-"
+        run: |
+          failed=0
+          for pair in "lint=$RESULT_LINT" "tests=$RESULT_TESTS"; do
+            job="${pair%%=*}"
+            result="${pair#*=}"
+            echo "$job: $result"
+            if [ "$result" = "success" ]; then
+              continue
+            fi
+            if [ "$result" = "skipped" ] && [[ " $SKIPPED_OK " == *" $job "* ]]; then
+              echo "::notice::$job was skipped by its own condition; allowed."
+              continue
+            fi
+            echo "::error::$job reported '$result', expected 'success'."
+            failed=1
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::quality-gate: one or more gated jobs did not succeed."
+            exit 1
+          fi
+          echo "quality-gate: all gated jobs succeeded."
