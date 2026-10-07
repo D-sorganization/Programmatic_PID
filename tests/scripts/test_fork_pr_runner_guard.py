@@ -164,7 +164,10 @@ def test_issue_comment_head_fetch_on_fleet_is_rejected(tmp_path: Path, run: str)
 def test_head_checkout_limited_to_pull_request_event_is_allowed(
     tmp_path: Path,
 ) -> None:
-    text = "on: [pull_request, pull_request_target]\njobs:\n  t:\n" + GUARD_IF + """\
+    text = (
+        "on: [pull_request, pull_request_target]\njobs:\n  t:\n"
+        + GUARD_IF
+        + """\
     runs-on: d-sorg-fleet
     steps:
       - if: github.event_name == 'pull_request'
@@ -172,6 +175,7 @@ def test_head_checkout_limited_to_pull_request_event_is_allowed(
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 """
+    )
     assert _violations(tmp_path, text) == []
 
 
@@ -251,13 +255,17 @@ def test_head_ref_passed_to_reusable_workflow_is_rejected(tmp_path: Path) -> Non
 def test_reusable_workflow_reading_caller_head_is_rejected(tmp_path: Path) -> None:
     # A callee inherits its caller's event, so a privileged caller
     # (workflow_run) hands it head refs even though the job guard passes.
-    text = "on: workflow_call\njobs:\n  t:\n" + GUARD_IF + """\
+    text = (
+        "on: workflow_call\njobs:\n  t:\n"
+        + GUARD_IF
+        + """\
     runs-on: d-sorg-fleet
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 """
+    )
     violations = _violations(tmp_path, text)
     assert len(violations) == 1
     assert "checks out PR head" in violations[0]
