@@ -1,0 +1,44 @@
+name: Fork PR Runner Guard
+
+# Fails when any workflow job can run fork pull-request code on the self-hosted
+# fleet (Repository_Management#1989). Runs on a GitHub-hosted runner on purpose:
+# it must stay operable and must never itself expose the fleet to fork code.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/fork_pr_runner_guard.py"
+      - "scripts/fork_pr_guard_analysis.py"
+  merge_group:
+  push:
+    branches-ignore: ["gh-readonly-queue/**"]
+    paths:
+      - ".github/workflows/**"
+      - "scripts/fork_pr_runner_guard.py"
+      - "scripts/fork_pr_guard_analysis.py"
+
+concurrency:
+  group: fork-pr-runner-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fork-pr-guard:
+    name: Fork PR runner guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: pip install --disable-pip-version-check pyyaml==6.0.2
+
+      - name: Verify no job runs fork PR code on the self-hosted fleet
+        run: python3 scripts/fork_pr_runner_guard.py --workflows-dir .github/workflows

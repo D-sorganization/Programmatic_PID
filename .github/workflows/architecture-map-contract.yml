@@ -35,6 +35,7 @@ jobs:
   validate-map:
     name: Validate Architecture Map Contract
     runs-on: ${{ !github.event.repository.private && vars.CI_RUNNER_MODE != 'local' && 'ubuntu-latest' || 'd-sorg-fleet' }}
+    if: (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 5
 
     steps:
