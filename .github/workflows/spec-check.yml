@@ -17,7 +17,9 @@ jobs:
   spec-freshness:
     name: Verify SPEC.md freshness
     runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'spec-exempt') }}
+    if: >-
+      (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) &&
+      !contains(github.event.pull_request.labels.*.name, 'spec-exempt')
     timeout-minutes: 5
 
     steps:

@@ -20,15 +20,27 @@ jobs:
     timeout-minutes: 60
     runs-on: ${{ vars.RUNNER_TARGET == 'local' && 'd-sorg-fleet' || 'ubuntu-latest' }}
     if: >-
-      github.event.pull_request.base.ref == 'main' &&
+      (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) &&
+      ((github.event.pull_request.base.ref == 'main' &&
       (github.event_name == 'pull_request' ||
-       github.event.label.name == 'phantom-guard-override') || github.event.pull_request.base.ref == 'master'
+      github.event.label.name == 'phantom-guard-override')) ||
+      github.event.pull_request.base.ref == 'master')
     steps:
+      # The PR head is only checked out for `pull_request` (fork PRs are
+      # excluded by the job `if:`). Under `pull_request_target` the base
+      # repository is checked out instead; PR head code never runs there.
       - name: Checkout PR head with full history
+        if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Checkout base repository with full history
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Anti-phantom guard
         env:
