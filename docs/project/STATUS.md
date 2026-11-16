@@ -41,4 +41,4 @@
 
 - Scope direction: Should Programmatic-PID remain a stable maintenance-mode utility, or is new feature development planned?
 - Branch hygiene: Should the 20 obsolete remote branches (`bot/sync-fleet-agents-*`, `fix/*`, `chore/*`) be deleted?
-- Legacy assets: Should `.gaai/core` autonomous delivery artifacts and historical assessment backlogs (`assessments/issues/EPIC-2026-04-26.md`) be formally deprecated and removed?
+- Legacy assets: the `.gaai/core` autonomous delivery artifacts were removed (RM #2725). Historical assessment backlogs (`assessments/issues/EPIC-2026-04-26.md`) remain as archive.
