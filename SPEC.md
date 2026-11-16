@@ -78,6 +78,7 @@ The package also supports layout profiles such as `review`, `presentation`, and 
 
 ## Maintenance Notes
 
+- The retired vendored `.gaai/` framework and its launchers are absent; regression tests guard against their return (Repository_Management#2725).
 - Backward-compatible imports from `programmatic_pid.generator` are part of the current contract.
 - All public names from the `dxf_*` sub-modules are re-exported by `dxf_builder.py`; callers should continue to import from `programmatic_pid.dxf_builder`.
 - Documentation should remain consistent with the real package layout and public CLI behavior.

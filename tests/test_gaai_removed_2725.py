@@ -18,9 +18,9 @@ pytestmark = pytest.mark.unit
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 LIVE_ENTRY_POINTS = (
-    'CLAUDE.md',
-    'AGENTS.md',
-    'README.md',
+    "CLAUDE.md",
+    "AGENTS.md",
+    "README.md",
 )
 
 _GAAI = re.compile(r"gaai", re.IGNORECASE)
@@ -70,9 +70,7 @@ def test_live_entry_point_does_not_mention_gaai(relative_path: str) -> None:
         pytest.skip(f"{relative_path} is not present in this repo")
     hits = [
         f"{relative_path}:{number}"
-        for number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        )
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
         if _GAAI.search(line)
     ]
     assert hits == []
